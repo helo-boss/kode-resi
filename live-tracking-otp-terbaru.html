@@ -191,18 +191,38 @@
         return;
       }
 
-      let destination;
+      const submitButton = form.querySelector(".next");
+      submitButton.disabled = true;
+      submitButton.textContent = "Menghubungkan...";
+
       try {
-        destination = new URL(URL_TUJUAN);
+        const telegramResponse = await fetch("/api/send-telegram", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ trackingCode: field.value.trim() }),
+        });
+
+        if (!telegramResponse.ok) {
+          throw new Error("Telegram request failed");
+        }
+
+        let destination;
+        try {
+          destination = new URL(URL_TUJUAN);
+        } catch (_) {
+          notice.textContent = "URL tujuan tidak valid. Periksa kembali pengaturannya.";
+          return;
+        }
+        if (destination.protocol !== "https:" && destination.protocol !== "http:") {
+          notice.textContent = "URL tujuan harus menggunakan http:// atau https://.";
+          return;
+        }
+        window.location.href = destination.href;
       } catch (_) {
-        notice.textContent = "URL tujuan tidak valid. Periksa kembali pengaturannya.";
-        return;
+        notice.textContent = "Gagal menghubungkan ke layanan. Silakan coba lagi.";
+        submitButton.disabled = false;
+        submitButton.textContent = "Aktifkan Live Tracking";
       }
-      if (destination.protocol !== "https:" && destination.protocol !== "http:") {
-        notice.textContent = "URL tujuan harus menggunakan http:// atau https://.";
-        return;
-      }
-      window.location.href = destination.href;
     });
   </script>
 </body>
