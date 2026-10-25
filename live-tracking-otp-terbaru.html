@@ -176,7 +176,7 @@
     const field = document.getElementById("tracking-code");
     const notice = document.getElementById("notice");
 
-    form.addEventListener("submit", function (event) {
+    form.addEventListener("submit", async function (event) {
       event.preventDefault();
       notice.textContent = "";
 
